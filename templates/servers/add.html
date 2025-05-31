@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}Добавить сервер - VPN Admin Panel{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    <h2>➕ Добавить VPN сервер</h2>
+    <a href="/admin/servers" class="btn btn-secondary">← Назад к списку</a>
+</div>
+
+<div class="card-grid" style="grid-template-columns: 1fr 1fr;">
+    <div class="card">
+        <div class="card-header">🖥️ Настройки сервера</div>
+        
+        <form method="POST" action="/admin/servers/add" id="serverForm">
+            <div class="form-group">
+                <label for="name">Название сервера *</label>
+                <input type="text" id="name" name="name" class="form-control" required 
+                       placeholder="Например: VPN-Server-DE-01" maxlength="50">
+                <small style="color: #6c757d;">Уникальное название для идентификации сервера</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="domain">Домен *</label>
+                <input type="text" id="domain" name="domain" class="form-control" required 
+                       placeholder="Например: server1.example.com" pattern="[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}">
+                <small style="color: #6c757d;">Домен или IP-адрес сервера</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="api_url">API URL *</label>
+                <input type="url" id="api_url" name="api_url" class="form-control" required 
+                       placeholder="https://server1.example.com:2053">
+                <small style="color: #6c757d;">URL для API панели управления</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="api_token">API токен *</label>
+                <div style="position: relative;">
+                    <input type="password" id="api_token" name="api_token" class="form-control" required 
+                           placeholder="Введите API токен панели управления" minlength="10">
+                    <button type="button" onclick="togglePassword()" 
+                            style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); border: none; background: none; cursor: pointer;">
+                        👁️
+                    </button>
+                </div>
+                <small style="color: #6c757d;">Токен доступа к API панели управления сервером</small>
+            </div>
+            
+            <div style="display: flex; gap: 15px; margin-top: 30px;">
+                <button type="submit" class="btn btn-success">✅ Добавить сервер</button>
+                <button type="button" onclick="testConnection()" class="btn btn-warning">🔍 Проверить соединение</button>
+                <button type="reset" class="btn btn-secondary">🔄 Очистить форму</button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">💡 Инструкция по настройке</div>
+        
+        <div style="display: grid; gap: 20px;">
+            <div style="padding: 15px; background: #e3f2fd; border-radius: 8px;">
+                <strong>📋 Шаг 1: Подготовка сервера</strong><br>
+                <small>
+                    1. Установите панель управления (3x-ui, x-ui и т.д.)<br>
+                    2. Убедитесь, что панель доступна по HTTPS<br>
+                    3. Получите API токен в настройках панели
+                </small>
+            </div>
+            
+            <div style="padding: 15px; background: #f3e5f5; border-radius: 8px;">
+                <strong>🔧 Шаг 2: Настройка API</strong><br>
+                <small>
+                    1. Откройте панель управления сервером<br>
+                    2. Перейдите в настройки API<br>
+                    3. Включите API доступ<br>
+                    4. Скопируйте токен безопасности
+                </small>
+            </div>
+            
+            <div style="padding: 15px; background: #e8f5e8; border-radius: 8px;">
+                <strong>🔗 Шаг 3: Проверка подключения</strong><br>
+                <small>
+                    1. Заполните все поля формы<br>
+                    2. Нажмите "Проверить соединение"<br>
+                    3. При успехе сохраните сервер<br>
+                    4. Сервер будет добавлен и активирован
+                </small>
+            </div>
+            
+            <div style="padding: 15px; background: #fff3e0; border-radius: 8px;">
+                <strong>⚠️ Требования к серверу</strong><br>
+                <small>
+                    • Ubuntu 20.04+ или аналогичная ОС<br>
+                    • Открытые порты: 443, 80, 2053<br>
+                    • Установленная панель управления<br>
+                    • Валидный SSL сертификат
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Результат проверки -->
+<div id="testResult" class="card" style="display: none;">
+    <div class="card-header">🔍 Результат проверки соединения</div>
+    <div id="testResultContent"></div>
+</div>
+
+<!-- Часто используемые шаблоны -->
+<div class="card">
+    <div class="card-header">📝 Быстрое заполнение</div>
+    
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+        <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <strong>3X-UI панель</strong><br>
+            <small>Стандартная настройка для 3X-UI</small><br>
+            <button type="button" onclick="fillTemplate('3x-ui')" class="btn btn-secondary" style="margin-top: 10px; width: 100%;">
+                Заполнить шаблон
+            </button>
+        </div>
+        
+        <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <strong>X-UI панель</strong><br>
+            <small>Классическая настройка для X-UI</small><br>
+            <button type="button" onclick="fillTemplate('x-ui')" class="btn btn-secondary" style="margin-top: 10px; width: 100%;">
+                Заполнить шаблон
+            </button>
+        </div>
+        
+        <div style="padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <strong>Marzban панель</strong><br>
+            <small>Современная настройка для Marzban</small><br>
+            <button type="button" onclick="fillTemplate('marzban')" class="btn btn-secondary" style="margin-top: 10px; width: 100%;">
+                Заполнить шаблон
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function togglePassword() {
+    const input = document.getElementById('api_token');
+    const button = event.target;
+    
+    if (input.type === 'password') {
+        input.type = 'text';
+        button.textContent = '🙈';
+    } else {
+        input.type = 'password';
+        button.textContent = '👁️';
+    }
+}
+
+async function testConnection() {
+    const form = document.getElementById('serverForm');
+    const formData = new FormData(form);
+    
+    const testButton = event.target;
+    const originalText = testButton.textContent;
+    
+    testButton.textContent = '⏳ Проверка...';
+    testButton.disabled = true;
+    
+    const resultDiv = document.getElementById('testResult');
+    const resultContent = document.getElementById('testResultContent');
+    
+    try {
+        const response = await fetch('/admin/servers/test-connection', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const result = await response.json();
+        
+        resultDiv.style.display = 'block';
+        
+        if (result.success) {
+            resultContent.innerHTML = `
+                <div style="padding: 20px; background: #d4edda; border-radius: 8px; border-left: 4px solid #28a745;">
+                    <h4 style="color: #155724; margin-bottom: 15px;">✅ Соединение успешно!</h4>
+                    <div style="display: grid; gap: 10px;">
+                        <div><strong>Статус сервера:</strong> ${result.server_info.status || 'Активен'}</div>
+                        <div><strong>Версия Xray:</strong> ${result.server_info.xray_version || 'Определяется...'}</div>
+                        <div><strong>Время ответа:</strong> ${result.response_time || 'N/A'}</div>
+                        ${result.server_info.uptime ? `<div><strong>Время работы:</strong> ${result.server_info.uptime}</div>` : ''}
+                    </div>
+                    <p style="margin-top: 15px; color: #155724;">
+                        🎉 Сервер готов к добавлению! Вы можете безопасно сохранить настройки.
+                    </p>
+                </div>
+            `;
+        } else {
+            resultContent.innerHTML = `
+                <div style="padding: 20px; background: #f8d7da; border-radius: 8px; border-left: 4px solid #dc3545;">
+                    <h4 style="color: #721c24; margin-bottom: 15px;">❌ Ошибка подключения</h4>
+                    <div style="margin-bottom: 15px;">
+                        <strong>Описание:</strong> ${result.error}
+                    </div>
+                    <div style="background: #fff; padding: 15px; border-radius: 6px; font-family: monospace; font-size: 12px;">
+                        ${result.details || 'Дополнительная информация недоступна'}
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <strong>Возможные решения:</strong>
+                        <ul style="margin-top: 8px;">
+                            <li>Проверьте правильность URL и порта</li>
+                            <li>Убедитесь, что API токен действителен</li>
+                            <li>Проверьте доступность сервера из интернета</li>
+                            <li>Убедитесь, что SSL сертификат действителен</li>
+                        </ul>
+                    </div>
+                </div>
+            `;
+        }
+    } catch (error) {
+        resultContent.innerHTML = `
+            <div style="padding: 20px; background: #f8d7da; border-radius: 8px; border-left: 4px solid #dc3545;">
+                <h4 style="color: #721c24;">❌ Ошибка запроса</h4>
+                <p>Не удалось выполнить проверку: ${error.message}</p>
+            </div>
+        `;
+        resultDiv.style.display = 'block';
+    } finally {
+        testButton.textContent = originalText;
+        testButton.disabled = false;
+    }
+}
+
+function fillTemplate(type) {
+    const domain = prompt('Введите домен вашего сервера (например: server1.example.com):');
+    if (!domain) return;
+    
+    const templates = {
+        '3x-ui': {
+            name: `3X-UI-${domain.split('.')[0]}`,
+            api_url: `https://${domain}:2053`,
+            placeholder_token: 'Получите токен из панели 3X-UI → Настройки → API'
+        },
+        'x-ui': {
+            name: `X-UI-${domain.split('.')[0]}`,
+            api_url: `https://${domain}:54321`,
+            placeholder_token: 'Получите токен из панели X-UI → Настройки → API'
+        },
+        'marzban': {
+            name: `Marzban-${domain.split('.')[0]}`,
+            api_url: `https://${domain}:8000`,
+            placeholder_token: 'Получите токен из панели Marzban → Admin → API Token'
+        }
+    };
+    
+    const template = templates[type];
+    if (!template) return;
+    
+    document.getElementById('name').value = template.name;
+    document.getElementById('domain').value = domain;
+    document.getElementById('api_url').value = template.api_url;
+    document.getElementById('api_token').placeholder = template.placeholder_token;
+    
+    alert(`Шаблон ${type.toUpperCase()} заполнен! Не забудьте ввести API токен.`);
+}
+
+// Валидация формы
+document.getElementById('serverForm').addEventListener('submit', function(e) {
+    const name = document.getElementById('name').value.trim();
+    const domain = document.getElementById('domain').value.trim();
+    const apiUrl = document.getElementById('api_url').value.trim();
+    const apiToken = document.getElementById('api_token').value.trim();
+    
+    if (!name || !domain || !apiUrl || !apiToken) {
+        e.preventDefault();
+        alert('Пожалуйста, заполните все обязательные поля');
+        return;
+    }
+    
+    if (!apiUrl.startsWith('http://') && !apiUrl.startsWith('https://')) {
+        e.preventDefault();
+        alert('API URL должен начинаться с http:// или https://');
+        return;
+    }
+    
+    if (apiToken.length < 10) {
+        e.preventDefault();
+        alert('API токен слишком короткий. Минимум 10 символов.');
+        return;
+    }
+});
+
+// Автоматическое заполнение API URL при вводе домена
+document.getElementById('domain').addEventListener('input', function() {
+    const domain = this.value.trim();
+    const apiUrlField = document.getElementById('api_url');
+    
+    if (domain && !apiUrlField.value) {
+        apiUrlField.value = `https://${domain}:2053`;
+    }
+});
+</script>
+{% endblock %}

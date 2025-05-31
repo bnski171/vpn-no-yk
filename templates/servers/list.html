@@ -1,0 +1,296 @@
+{% extends "base.html" %}
+
+{% block title %}Серверы - VPN Admin Panel{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    <h2>🖥️ VPN Серверы</h2>
+    <div>
+        <a href="/admin/servers/add" class="btn btn-success">➕ Добавить сервер</a>
+        <button onclick="refreshAllStatuses()" class="btn btn-secondary">🔄 Обновить статусы</button>
+    </div>
+</div>
+
+<!-- Статистика серверов -->
+<div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 25px;">
+    <div class="stat-card">
+        <div class="stat-value">{{ servers|length }}</div>
+        <div>Всего серверов</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ servers_stats.online_count or 0 }}</div>
+        <div>Онлайн</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ servers_stats.total_users or 0 }}</div>
+        <div>Пользователей</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ servers_stats.avg_load or 0 }}%</div>
+        <div>Средняя загрузка</div>
+    </div>
+</div>
+
+<!-- Список серверов -->
+<div class="card-grid">
+    {% for server in servers %}
+    <div class="card server-card" data-server-id="{{ server.id }}">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <strong>{{ server.name }}</strong>
+                <br><small style="color: #6c757d;">{{ server.domain }}</small>
+            </div>
+            <div>
+                {% if server.is_active %}
+                    <span class="status status-active">Активен</span>
+                {% else %}
+                    <span class="status status-expired">Отключен</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div style="display: grid; gap: 15px; margin-top: 15px;">
+            <!-- Основная информация -->
+            <div>
+                <strong>API URL:</strong><br>
+                <span style="font-family: monospace; font-size: 12px; color: #6c757d;">{{ server.api_url }}</span>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                <div>
+                    <strong>Пользователей:</strong><br>
+                    <span style="font-size: 18px; font-weight: bold; color: #007bff;">{{ server.user_count or 0 }}</span>
+                </div>
+                <div>
+                    <strong>Создан:</strong><br>
+                    <span style="font-size: 12px; color: #6c757d;">{{ server.created_at.strftime('%d.%m.%Y') }}</span>
+                </div>
+            </div>
+
+            <!-- Статус сервера -->
+            <div class="server-status" id="status-{{ server.id }}">
+                {% if server.status %}
+                    {% if server.status.get('error') %}
+                        <div style="padding: 10px; background: #f8d7da; border-radius: 6px; border-left: 4px solid #dc3545;">
+                            <strong style="color: #721c24;">❌ Ошибка подключения</strong><br>
+                            <small>{{ server.status.error }}</small>
+                        </div>
+                    {% else %}
+                        <div style="padding: 10px; background: #d4edda; border-radius: 6px; border-left: 4px solid #28a745;">
+                            <strong style="color: #155724;">✅ Сервер онлайн</strong>
+
+                            {% if server.status.get('xray', {}).get('running', {}).get('service_active') %}
+                                <br><small>🔐 Xray активен</small>
+                            {% endif %}
+
+                            {% if server.status.get('system') %}
+                                <div style="margin-top: 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; font-size: 11px;">
+                                    {% if server.status.system.get('cpu') %}
+                                    <div>
+                                        <strong>CPU:</strong> {{ server.status.system.cpu.get('percent', 'N/A') }}%
+                                    </div>
+                                    {% endif %}
+                                    {% if server.status.system.get('memory') %}
+                                    <div>
+                                        <strong>RAM:</strong> {{ server.status.system.memory.get('percent', 'N/A') }}%
+                                    </div>
+                                    {% endif %}
+                                    {% if server.status.system.get('disk') %}
+                                    <div>
+                                        <strong>Диск:</strong> {{ server.status.system.disk.get('percent', 'N/A') }}%
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div style="padding: 10px; background: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
+                        <strong style="color: #856404;">⏳ Проверка статуса...</strong>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Действия -->
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                <a href="/admin/servers/{{ server.id }}" class="btn" style="flex: 1; padding: 8px 12px; font-size: 12px;">
+                    📊 Подробно
+                </a>
+                <a href="/admin/servers/{{ server.id }}/edit" class="btn btn-warning" style="flex: 1; padding: 8px 12px; font-size: 12px;">
+                    ✏️ Изменить
+                </a>
+                <button onclick="toggleServerStatus({{ server.id }})"
+                        class="btn {% if server.is_active %}btn-secondary{% else %}btn-success{% endif %}"
+                        style="flex: 1; padding: 8px 12px; font-size: 12px;">
+                    {% if server.is_active %}⏸️ Отключить{% else %}▶️ Включить{% endif %}
+                </button>
+            </div>
+
+            {% if (server.user_count or 0) == 0 %}
+            <form method="POST" action="/admin/servers/{{ server.id }}/delete"
+                  onsubmit="return confirmDelete('Удалить сервер {{ server.name }}?')"
+                  style="margin-top: 10px;">
+                <button type="submit" class="btn btn-danger" style="width: 100%; padding: 8px; font-size: 12px;">
+                    🗑️ Удалить сервер
+                </button>
+            </form>
+            {% else %}
+            <div style="text-align: center; margin-top: 10px;">
+                <small style="color: #dc3545;">Нельзя удалить сервер с пользователями</small>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% else %}
+    <div style="grid-column: 1 / -1; text-align: center; padding: 60px; color: #6c757d;">
+        <h3>🖥️ Серверы не найдены</h3>
+        <p>Добавьте первый VPN сервер для начала работы</p>
+        <a href="/admin/servers/add" class="btn btn-success">➕ Добавить первый сервер</a>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Быстрая диагностика -->
+<div class="card">
+    <div class="card-header">🔧 Быстрая диагностика</div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+        <button onclick="checkAllServers()" class="btn btn-secondary">
+            🔍 Проверить все серверы
+        </button>
+        <button onclick="restartAllXray()" class="btn btn-warning">
+            🔄 Перезапустить Xray на всех
+        </button>
+        <button onclick="exportServerConfigs()" class="btn">
+            📥 Экспорт конфигураций
+        </button>
+        <button onclick="showServerLogs()" class="btn">
+            📋 Показать логи
+        </button>
+    </div>
+</div>
+
+<script>
+async function refreshAllStatuses() {
+    const statusElements = document.querySelectorAll('.server-status');
+
+    statusElements.forEach(element => {
+        element.innerHTML = `
+            <div style="padding: 10px; background: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
+                <strong style="color: #856404;">⏳ Обновление статуса...</strong>
+            </div>
+        `;
+    });
+
+    try {
+        const response = await fetch('/admin/servers/refresh-statuses', { method: 'POST' });
+        if (response.ok) {
+            location.reload();
+        } else {
+            throw new Error('Ошибка обновления статусов');
+        }
+    } catch (error) {
+        alert('Ошибка обновления статусов: ' + error.message);
+    }
+}
+
+async function toggleServerStatus(serverId) {
+    if (!confirm('Изменить статус сервера?')) return;
+
+    try {
+        const response = await fetch(`/admin/servers/${serverId}/toggle`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+
+        if (response.ok) {
+            location.reload();
+        } else {
+            throw new Error('Ошибка изменения статуса');
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error.message);
+    }
+}
+
+async function checkAllServers() {
+    const button = event.target;
+    const originalText = button.textContent;
+
+    button.textContent = '⏳ Проверка...';
+    button.disabled = true;
+
+    try {
+        const response = await fetch('/admin/servers/check-all', { method: 'POST' });
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+                alert(`Проверка завершена:\n✅ Онлайн: ${result.online}\n❌ Оффлайн: ${result.offline}`);
+            } else {
+                throw new Error(result.error || 'Ошибка проверки');
+            }
+        } else {
+            throw new Error('Ошибка запроса');
+        }
+    } catch (error) {
+        alert('Ошибка проверки серверов: ' + error.message);
+    } finally {
+        button.textContent = originalText;
+        button.disabled = false;
+    }
+}
+
+async function restartAllXray() {
+    if (!confirm('Перезапустить Xray на всех серверах? Это может временно прервать соединения пользователей.')) {
+        return;
+    }
+
+    const button = event.target;
+    const originalText = button.textContent;
+
+    button.textContent = '⏳ Перезапуск...';
+    button.disabled = true;
+
+    try {
+        const response = await fetch('/admin/servers/restart-xray', { method: 'POST' });
+        if (response.ok) {
+            const result = await response.json();
+            if (result.success) {
+                alert(`Перезапуск завершен:\n✅ Успешно: ${result.successful}\n❌ Ошибки: ${result.failed}`);
+                refreshAllStatuses();
+            } else {
+                throw new Error(result.error || 'Ошибка перезапуска');
+            }
+        } else {
+            throw new Error('Ошибка запроса');
+        }
+    } catch (error) {
+        alert('Ошибка перезапуска Xray: ' + error.message);
+    } finally {
+        button.textContent = originalText;
+        button.disabled = false;
+    }
+}
+
+function exportServerConfigs() {
+    window.open('/admin/servers/export', '_blank');
+}
+
+function showServerLogs() {
+    window.open('/admin/servers/logs', '_blank');
+}
+
+function confirmDelete(message) {
+    return confirm(message || 'Вы уверены, что хотите удалить?');
+}
+
+// Автообновление статусов каждые 30 секунд
+setInterval(() => {
+    if (!document.hidden) {
+        refreshAllStatuses();
+    }
+}, 30000);
+</script>
+{% endblock %}

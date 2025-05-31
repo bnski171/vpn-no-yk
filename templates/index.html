@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}Главная - VPN Admin Panel{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total_users }}</div>
+        <div>Всего пользователей</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.active_users }}</div>
+        <div>Активных подписок</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total_servers }}</div>
+        <div>Серверов</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.active_servers }}</div>
+        <div>Активных серверов</div>
+    </div>
+</div>
+
+<div class="card-grid">
+    <div class="card">
+        <div class="card-header">🚀 Быстрые действия</div>
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <a href="/admin/users/add" class="btn btn-success">➕ Добавить пользователя</a>
+            <a href="/admin/servers/add" class="btn btn-success">🖥️ Добавить сервер</a>
+            <a href="/admin/promocodes/add" class="btn btn-warning">🎟️ Создать промокод</a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">📈 Последняя активность</div>
+        {% if recent_activity %}
+            {% for activity in recent_activity %}
+            <div style="padding: 8px 0; border-bottom: 1px solid #f8f9fa;">
+                <strong>{{ activity.action }}</strong>
+                <br>
+                <small>{{ activity.details }}</small>
+                <br>
+                <small class="text-muted" data-timestamp="{{ activity.timestamp }}">{{ activity.timestamp }}</small>
+            </div>
+            {% endfor %}
+        {% else %}
+            <p>Нет активности</p>
+        {% endif %}
+    </div>
+
+    <div class="card">
+        <div class="card-header">⚠️ Уведомления</div>
+        {% if notifications %}
+            {% for notification in notifications %}
+            <div class="alert alert-{{ notification.type }}">
+                {{ notification.message }}
+            </div>
+            {% endfor %}
+        {% else %}
+            <p>Все в порядке! 😊</p>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">📊 Статистика по серверам</div>
+    {% if server_stats %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Сервер</th>
+                    <th>Пользователей</th>
+                    <th>Статус</th>
+                    <th>Загрузка CPU</th>
+                    <th>Память</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for server in server_stats %}
+                <tr>
+                    <td>
+                        <strong>{{ server.name }}</strong><br>
+                        <small>{{ server.domain }}</small>
+                    </td>
+                    <td>{{ server.user_count }}</td>
+                    <td>
+                        {% if server.is_online %}
+                            <span class="status status-active">Онлайн</span>
+                        {% else %}
+                            <span class="status status-expired">Оффлайн</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ server.cpu_usage }}%</td>
+                    <td>{{ server.memory_usage }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>Нет серверов для отображения</p>
+    {% endif %}
+</div>
+{% endblock %}

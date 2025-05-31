@@ -1,0 +1,358 @@
+{% extends "base.html" %}
+
+{% block title %}Промокоды - VPN Admin Panel{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    <h2>🎟️ Промокоды</h2>
+    <div>
+        <a href="/admin/promocodes/add" class="btn btn-success">➕ Создать промокод</a>
+        <button onclick="bulkCreatePromocodes()" class="btn btn-warning">📦 Массовое создание</button>
+    </div>
+</div>
+
+<!-- Статистика промокодов -->
+<div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 25px;">
+    <div class="stat-card">
+        <div class="stat-value">{{ promocodes|length }}</div>
+        <div>Всего промокодов</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ promocodes_stats.active_count }}</div>
+        <div>Активных</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ promocodes_stats.total_activations }}</div>
+        <div>Всего активаций</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ promocodes_stats.available_activations }}</div>
+        <div>Доступно активаций</div>
+    </div>
+</div>
+
+<!-- Фильтры -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">🔍 Фильтры</div>
+    <form method="GET" style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; align-items: end;">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Поиск по коду</label>
+            <input type="text" name="search" class="form-control" value="{{ request.args.get('search', '') }}" placeholder="Введите код промокода">
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Статус</label>
+            <select name="status" class="form-control">
+                <option value="">Все</option>
+                <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>Активные</option>
+                <option value="inactive" {% if request.args.get('status') == 'inactive' %}selected{% endif %}>Неактивные</option>
+                <option value="exhausted" {% if request.args.get('status') == 'exhausted' %}selected{% endif %}>Исчерпанные</option>
+            </select>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Продолжительность</label>
+            <select name="duration" class="form-control">
+                <option value="">Любая</option>
+                <option value="3600" {% if request.args.get('duration') == '3600' %}selected{% endif %}>1 час</option>
+                <option value="86400" {% if request.args.get('duration') == '86400' %}selected{% endif %}>1 день</option>
+                <option value="604800" {% if request.args.get('duration') == '604800' %}selected{% endif %}>7 дней</option>
+                <option value="2592000" {% if request.args.get('duration') == '2592000' %}selected{% endif %}>30 дней</option>
+            </select>
+        </div>
+        
+        <button type="submit" class="btn">🔍 Поиск</button>
+    </form>
+</div>
+
+<!-- Список промокодов -->
+<div class="card">
+    <div class="card-header">Список промокодов</div>
+    
+    {% if promocodes %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Код</th>
+                    <th>Продолжительность</th>
+                    <th>Активации</th>
+                    <th>Статус</th>
+                    <th>Создан</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for promo in promocodes %}
+                <tr>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <strong style="font-family: monospace; font-size: 16px;">{{ promo.code }}</strong>
+                            <button onclick="copyToClipboard('{{ promo.code }}')" class="btn" style="padding: 2px 6px; font-size: 10px;">
+                                📋
+                            </button>
+                        </div>
+                    </td>
+                    <td>
+                        <strong>{{ promo.duration_human }}</strong><br>
+                        <small style="color: #6c757d; font-family: monospace;">{{ promo.duration_seconds }} сек</small>
+                    </td>
+                    <td>
+                        <div style="text-align: center;">
+                            <div style="font-size: 18px; font-weight: bold;">
+                                {{ promo.current_activations }} / {{ promo.max_activations }}
+                            </div>
+                            <div style="background: #e9ecef; border-radius: 10px; height: 6px; margin: 5px 0;">
+                                {% set percentage = (promo.current_activations / promo.max_activations * 100) if promo.max_activations > 0 else 0 %}
+                                <div style="background: {% if percentage < 70 %}#28a745{% elif percentage < 90 %}#ffc107{% else %}#dc3545{% endif %}; 
+                                           width: {{ percentage }}%; height: 100%; border-radius: 10px; transition: width 0.3s ease;"></div>
+                            </div>
+                            <small style="color: #6c757d;">
+                                Осталось: {{ promo.max_activations - promo.current_activations }}
+                            </small>
+                        </div>
+                    </td>
+                    <td>
+                        {% if not promo.is_active %}
+                            <span class="status status-expired">❌ Отключен</span>
+                        {% elif promo.current_activations >= promo.max_activations %}
+                            <span class="status status-warning">⚠️ Исчерпан</span>
+                        {% else %}
+                            <span class="status status-active">✅ Активен</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span data-timestamp="{{ promo.created_at.isoformat() }}">
+                            {{ promo.created_at.strftime('%d.%m.%Y %H:%M') }}
+                        </span>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                            <button onclick="togglePromocodeStatus({{ promo.id }})" 
+                                    class="btn {% if promo.is_active %}btn-secondary{% else %}btn-success{% endif %}" 
+                                    style="padding: 4px 8px; font-size: 12px;">
+                                {% if promo.is_active %}⏸️ Отключить{% else %}▶️ Включить{% endif %}
+                            </button>
+                            
+                            <button onclick="showPromocodeDetails({{ promo.id }})" 
+                                    class="btn" style="padding: 4px 8px; font-size: 12px;">
+                                📊 Детали
+                            </button>
+                            
+                            <form method="POST" action="/admin/promocodes/{{ promo.id }}/delete" 
+                                  style="display: inline;" 
+                                  onsubmit="return confirmDelete('Удалить промокод {{ promo.code }}?')">
+                                <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;">
+                                    🗑️
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 60px; color: #6c757d;">
+        <h3>🎟️ Промокоды не найдены</h3>
+        <p>Создайте первый промокод для пользователей</p>
+        <a href="/admin/promocodes/add" class="btn btn-success">➕ Создать первый промокод</a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Генератор промокодов -->
+<div class="card">
+    <div class="card-header">🎲 Быстрый генератор промокодов</div>
+    
+    <div class="card-grid" style="grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));">
+        <form method="POST" action="/admin/promocodes/quick-create" style="display: contents;">
+            <div class="card" style="margin: 0; background: #f8f9fa;">
+                <strong>⚡ 1 час доступа</strong><br>
+                <small>Для тестирования</small>
+                <input type="hidden" name="duration_seconds" value="3600">
+                <input type="hidden" name="max_activations" value="10">
+                <button type="submit" class="btn btn-success" style="margin-top: 10px; width: 100%;">
+                    Создать
+                </button>
+            </div>
+        </form>
+        
+        <form method="POST" action="/admin/promocodes/quick-create" style="display: contents;">
+            <div class="card" style="margin: 0; background: #f8f9fa;">
+                <strong>📅 3 дня доступа</strong><br>
+                <small>Пробный период</small>
+                <input type="hidden" name="duration_seconds" value="259200">
+                <input type="hidden" name="max_activations" value="50">
+                <button type="submit" class="btn btn-success" style="margin-top: 10px; width: 100%;">
+                    Создать
+                </button>
+            </div>
+        </form>
+        
+        <form method="POST" action="/admin/promocodes/quick-create" style="display: contents;">
+            <div class="card" style="margin: 0; background: #f8f9fa;">
+                <strong>🎁 7 дней доступа</strong><br>
+                <small>Подарочный</small>
+                <input type="hidden" name="duration_seconds" value="604800">
+                <input type="hidden" name="max_activations" value="25">
+                <button type="submit" class="btn btn-warning" style="margin-top: 10px; width: 100%;">
+                    Создать
+                </button>
+            </div>
+        </form>
+        
+        <form method="POST" action="/admin/promocodes/quick-create" style="display: contents;">
+            <div class="card" style="margin: 0; background: #f8f9fa;">
+                <strong>💎 30 дней доступа</strong><br>
+                <small>VIP промокод</small>
+                <input type="hidden" name="duration_seconds" value="2592000">
+                <input type="hidden" name="max_activations" value="5">
+                <button type="submit" class="btn btn-warning" style="margin-top: 10px; width: 100%;">
+                    Создать
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Модальное окно для деталей промокода -->
+<div id="promocodeModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+    <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border-radius: 15px; padding: 30px; max-width: 600px; width: 90%;">
+        <div id="modalContent">
+            <!-- Содержимое будет загружено динамически -->
+        </div>
+        <button onclick="closeModal()" class="btn btn-secondary" style="margin-top: 20px;">Закрыть</button>
+    </div>
+</div>
+
+<script>
+async function togglePromocodeStatus(promocodeId) {
+    try {
+        const response = await fetch(`/admin/promocodes/${promocodeId}/toggle`, { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        if (response.ok) {
+            location.reload();
+        } else {
+            throw new Error('Ошибка изменения статуса');
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error.message);
+    }
+}
+
+async function showPromocodeDetails(promocodeId) {
+    try {
+        const response = await fetch(`/admin/promocodes/${promocodeId}/details`);
+        const result = await response.json();
+        
+        if (result.success) {
+            const promo = result.promocode;
+            const activations = result.activations;
+            
+            let activationsList = '';
+            if (activations.length > 0) {
+                activationsList = activations.map(activation => 
+                    `<tr>
+                        <td>${activation.user_telegram_id}</td>
+                        <td>${activation.activated_at}</td>
+                    </tr>`
+                ).join('');
+                activationsList = `
+                    <h4>История активаций:</h4>
+                    <table class="table">
+                        <thead>
+                            <tr><th>Пользователь</th><th>Дата активации</th></tr>
+                        </thead>
+                        <tbody>${activationsList}</tbody>
+                    </table>
+                `;
+            } else {
+                activationsList = '<p style="color: #6c757d;">Промокод еще не использовался</p>';
+            }
+            
+            document.getElementById('modalContent').innerHTML = `
+                <h3>🎟️ Детали промокода ${promo.code}</h3>
+                <div style="display: grid; gap: 15px; margin: 20px 0;">
+                    <div><strong>Код:</strong> <span style="font-family: monospace; font-size: 16px;">${promo.code}</span></div>
+                    <div><strong>Продолжительность:</strong> ${promo.duration_human} (${promo.duration_seconds} сек)</div>
+                    <div><strong>Активаций:</strong> ${promo.current_activations} из ${promo.max_activations}</div>
+                    <div><strong>Статус:</strong> ${promo.is_active ? '<span class="status status-active">Активен</span>' : '<span class="status status-expired">Отключен</span>'}</div>
+                    <div><strong>Создан:</strong> ${promo.created_at}</div>
+                </div>
+                ${activationsList}
+            `;
+            
+            document.getElementById('promocodeModal').style.display = 'block';
+        } else {
+            throw new Error(result.error || 'Ошибка загрузки деталей');
+        }
+    } catch (error) {
+        alert('Ошибка загрузки деталей: ' + error.message);
+    }
+}
+
+function closeModal() {
+    document.getElementById('promocodeModal').style.display = 'none';
+}
+
+function bulkCreatePromocodes() {
+    const count = prompt('Сколько промокодов создать? (максимум 100)');
+    if (!count || isNaN(count) || count < 1 || count > 100) {
+        alert('Введите число от 1 до 100');
+        return;
+    }
+    
+    const duration = prompt('Продолжительность в секундах (например, 86400 для 1 дня):');
+    if (!duration || isNaN(duration) || duration < 1) {
+        alert('Введите корректное количество секунд');
+        return;
+    }
+    
+    const maxActivations = prompt('Максимум активаций для каждого промокода:');
+    if (!maxActivations || isNaN(maxActivations) || maxActivations < 1) {
+        alert('Введите корректное количество активаций');
+        return;
+    }
+    
+    if (!confirm(`Создать ${count} промокодов на ${Math.floor(duration/86400)} дней с ${maxActivations} активациями каждый?`)) {
+        return;
+    }
+    
+    // Отправляем запрос на массовое создание
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/admin/promocodes/bulk-create';
+    
+    const fields = {
+        count: count,
+        duration_seconds: duration,
+        max_activations: maxActivations
+    };
+    
+    for (const [key, value] of Object.entries(fields)) {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = value;
+        form.appendChild(input);
+    }
+    
+    document.body.appendChild(form);
+    form.submit();
+}
+
+// Закрытие модального окна по клику вне его
+document.getElementById('promocodeModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeModal();
+    }
+});
+</script>
+{% endblock %}

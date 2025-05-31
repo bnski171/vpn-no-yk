@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block title %}Продлить подписку - {{ user.telegram_id }}{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    <h2>⏰ Продлить подписку для {{ user.telegram_id }}</h2>
+    <div>
+        <a href="/admin/users/{{ user.id }}" class="btn btn-secondary">← Назад к пользователю</a>
+        <a href="/admin/users" class="btn btn-secondary">📋 К списку пользователей</a>
+    </div>
+</div>
+
+<div class="card-grid" style="grid-template-columns: 1fr 1fr;">
+    <!-- Текущий статус -->
+    <div class="card">
+        <div class="card-header">📊 Текущий статус подписки</div>
+        <div style="display: grid; gap: 15px;">
+            <div>
+                <strong>Пользователь:</strong><br>
+                <span style="font-family: monospace; font-size: 16px;">{{ user.telegram_id }}</span>
+            </div>
+            <div>
+                <strong>Email:</strong><br>
+                <span style="font-family: monospace; color: #6c757d;">{{ user.email }}</span>
+            </div>
+            <div>
+                <strong>Сервер:</strong><br>
+                {% if user.server_name %}
+                    <span class="status status-active">{{ user.server_name }}</span>
+                {% else %}
+                    <span class="status status-warning">Не назначен</span>
+                {% endif %}
+            </div>
+            <div>
+                <strong>Текущая дата окончания:</strong><br>
+                <span style="font-size: 18px; font-weight: bold;">
+                    {{ user.subscription_end.strftime('%d.%m.%Y %H:%M:%S') }}
+                </span>
+            </div>
+            <div>
+                <strong>Статус:</strong><br>
+                {% if user.is_subscription_active %}
+                    <span class="status status-active">✅ Активна</span>
+                {% else %}
+                    <span class="status status-expired">❌ Истекла</span>
+                {% endif %}
+            </div>
+            <div>
+                <strong>Осталось времени:</strong><br>
+                {% set time_left = user.time_left_seconds %}
+                {% if time_left > 0 %}
+                    <span style="color: #28a745; font-weight: bold;">
+                        {{ time_left // 86400 }} дн {{ (time_left % 86400) // 3600 }} ч {{ ((time_left % 3600) // 60) }} мин
+                    </span><br>
+                    <small style="font-family: monospace;">({{ time_left }} секунд)</small>
+                {% else %}
+                    <span style="color: #dc3545; font-weight: bold;">Подписка истекла</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Быстрое продление -->
+    <div class="card">
+        <div class="card-header">⚡ Быстрое продление</div>
+        <div style="display: grid; gap: 15px;">
+            <form method="POST" action="/admin/users/{{ user.id }}/extend-seconds">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                    <button type="submit" name="seconds" value="3600" class="btn btn-success">
+                        ➕ 1 час<br><small>(3,600 сек)</small>
+                    </button>
+                    <button type="submit" name="seconds" value="10800" class="btn btn-success">
+                        ➕ 3 часа<br><small>(10,800 сек)</small>
+                    </button>
+                    <button type="submit" name="seconds" value="21600" class="btn btn-success">
+                        ➕ 6 часов<br><small>(21,600 сек)</small>
+                    </button>
+                    <button type="submit" name="seconds" value="43200" class="btn btn-success">
+                        ➕ 12 часов<br><small>(43,200 сек)</small>
+                    </button>
+                    <button type="submit" name="seconds" value="86400" class="btn btn-success">
+                        ➕ 1 день<br><small>(86,400 сек)</small>
+                    </button>
+                    <button type="submit" name="seconds" value="259200" class="btn btn-success">
+                        ➕ 3 дня<br><small>(259,200 сек)</small>
+                    </button>
+                    <button type="submit" name="seconds" value="604800" class="btn btn-success">
+                        ➕ 7 дней<br><small>(604,800 сек)</small>
+                    </button>
+                    <button type="submit" name="seconds" value="1209600" class="btn btn-success">
+                        ➕ 14 дней<br><small>(1,209,600 сек)</small>
+                    </button>
+                    <button type="submit" name="seconds" value="2592000" class="btn btn-warning">
+                        ➕ 30 дней<br><small>(2,592,000 сек)</small>
+                    </button>
+                    <button type="submit" name="seconds" value="7776000" class="btn btn-warning">
+                        ➕ 90 дней<br><small>(7,776,000 сек)</small>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Произвольное время -->
+<div class="card">
+    <div class="card-header">🎯 Произвольное продление</div>
+    
+    <div class="card-grid" style="grid-template-columns: 1fr 1fr;">
+        <!-- По секундам -->
+        <div>
+            <h4>По секундам</h4>
+            <form method="POST" action="/admin/users/{{ user.id }}/extend-seconds">
+                <div class="form-group">
+                    <label for="custom_seconds">Количество секунд</label>
+                    <input type="number" id="custom_seconds" name="seconds" class="form-control" 
+                           placeholder="Например: 3600" min="1" max="31536000" required>
+                    <small style="color: #6c757d;">Максимум: 31,536,000 сек (1 год)</small>
+                </div>
+                <button type="submit" class="btn btn-warning">➕ Добавить секунды</button>
+            </form>
+        </div>
+
+        <!-- Калькулятор времени -->
+        <div>
+            <h4>Калькулятор времени</h4>
+            <div style="display: grid; gap: 10px;">
+                <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;">
+                    <input type="number" id="calc_minutes" placeholder="Минуты" min="0" class="form-control">
+                    <span>мин</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;">
+                    <input type="number" id="calc_hours" placeholder="Часы" min="0" class="form-control">
+                    <span>ч</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center;">
+                    <input type="number" id="calc_days" placeholder="Дни" min="0" class="form-control">
+                    <span>дн</span>
+                </div>
+                <div style="padding: 10px; background: #f8f9fa; border-radius: 8px; text-align: center;">
+                    <strong>Итого секунд: <span id="total_seconds">0</span></strong>
+                </div>
+                <button type="button" class="btn btn-secondary" onclick="copyCalculatedSeconds()">
+                    📋 Скопировать в поле выше
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Установка точной даты -->
+<div class="card">
+    <div class="card-header">📅 Установить точную дату окончания</div>
+    
+    <form method="POST" action="/admin/users/{{ user.id }}/set-end-date">
+        <div class="form-group">
+            <label for="end_date">Новая дата окончания подписки</label>
+            <input type="datetime-local" id="end_date" name="end_date" class="form-control" required>
+            <small style="color: #6c757d;">
+                Текущая дата окончания: {{ user.subscription_end.strftime('%Y-%m-%dT%H:%M') }}
+            </small>
+        </div>
+        
+        <div style="display: flex; gap: 15px; align-items: center;">
+            <button type="submit" class="btn btn-warning">📅 Установить дату</button>
+            <button type="button" class="btn btn-secondary" onclick="setDateFromNow(24)">+24 часа от сейчас</button>
+            <button type="button" class="btn btn-secondary" onclick="setDateFromNow(168)">+7 дней от сейчас</button>
+            <button type="button" class="btn btn-secondary" onclick="setDateFromNow(720)">+30 дней от сейчас</button>
+        </div>
+    </form>
+</div>
+
+<!-- Активация промокода -->
+<div class="card">
+    <div class="card-header">🎟️ Активировать промокод</div>
+    
+    <form method="POST" action="/admin/users/{{ user.id }}/activate-promocode">
+        <div class="form-group">
+            <label for="promocode">Выберите промокод</label>
+            <select id="promocode" name="promocode" class="form-control" required>
+                <option value="">-- Выберите промокод --</option>
+                {% for promo in available_promocodes %}
+                <option value="{{ promo.code }}">
+                    {{ promo.code }} - {{ promo.duration_seconds // 3600 }} часов 
+                    (осталось активаций: {{ promo.max_activations - promo.current_activations }})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        {% if available_promocodes %}
+            <button type="submit" class="btn btn-success">🎟️ Активировать промокод</button>
+        {% else %}
+            <p style="color: #6c757d;">Нет доступных промокодов для активации</p>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Предварительный просмотр -->
+<div class="card" style="border: 2px solid #28a745;">
+    <div class="card-header" style="color: #28a745;">🔮 Предварительный просмотр</div>
+    <div id="preview_result" style="padding: 20px; text-align: center; color: #6c757d;">
+        Выберите способ продления, чтобы увидеть новую дату окончания подписки
+    </div>
+</div>
+
+<script>
+// Калькулятор времени
+function updateCalculator() {
+    const minutes = parseInt(document.getElementById('calc_minutes').value) || 0;
+    const hours = parseInt(document.getElementById('calc_hours').value) || 0;
+    const days = parseInt(document.getElementById('calc_days').value) || 0;
+    
+    const totalSeconds = (minutes * 60) + (hours * 3600) + (days * 86400);
+    document.getElementById('total_seconds').textContent = totalSeconds.toLocaleString();
+    
+    // Показываем предварительный просмотр
+    if (totalSeconds > 0) {
+        showPreview(totalSeconds);
+    }
+}
+
+function copyCalculatedSeconds() {
+    const totalSeconds = document.getElementById('total_seconds').textContent.replace(/,/g, '');
+    document.getElementById('custom_seconds').value = totalSeconds;
+    showPreview(parseInt(totalSeconds));
+}
+
+function setDateFromNow(hours) {
+    const now = new Date();
+    now.setHours(now.getHours() + hours);
+    
+    const year = now.getFullYear();
+    const month = ('0' + (now.getMonth() + 1)).slice(-2);
+    const day = ('0' + now.getDate()).slice(-2);
+    const hour = ('0' + now.getHours()).slice(-2);
+    const minute = ('0' + now.getMinutes()).slice(-2);
+    
+    document.getElementById('end_date').value = `${year}-${month}-${day}T${hour}:${minute}`;
+    
+    // Показываем предварительный просмотр
+    showPreviewDate(now);
+}
+
+function showPreview(additionalSeconds) {
+    const currentEnd = new Date('{{ user.subscription_end.isoformat() }}');
+    const now = new Date();
+    
+    // Если подписка истекла, считаем от текущего времени
+    const baseDate = currentEnd > now ? currentEnd : now;
+    const newEnd = new Date(baseDate.getTime() + (additionalSeconds * 1000));
+    
+    showPreviewDate(newEnd);
+}
+
+function showPreviewDate(newDate) {
+    const formatted = newDate.toLocaleString('ru-RU', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+    });
+    
+    const now = new Date();
+    const diffMs = newDate - now;
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    
+    document.getElementById('preview_result').innerHTML = `
+        <strong style="color: #28a745;">Новая дата окончания:</strong><br>
+        <span style="font-size: 18px; font-weight: bold;">${formatted}</span><br>
+        <small style="color: #6c757d;">
+            Это ${diffDays} дней и ${diffHours} часов от текущего момента
+        </small>
+    `;
+}
+
+// Добавляем обработчики событий
+document.addEventListener('DOMContentLoaded', function() {
+    // Калькулятор
+    ['calc_minutes', 'calc_hours', 'calc_days'].forEach(id => {
+        document.getElementById(id).addEventListener('input', updateCalculator);
+    });
+    
+    // Произвольные секунды
+    document.getElementById('custom_seconds').addEventListener('input', function() {
+        const seconds = parseInt(this.value);
+        if (seconds > 0) {
+            showPreview(seconds);
+        }
+    });
+    
+    // Точная дата
+    document.getElementById('end_date').addEventListener('change', function() {
+        if (this.value) {
+            const selectedDate = new Date(this.value);
+            showPreviewDate(selectedDate);
+        }
+    });
+    
+    // Кнопки быстрого продления
+    document.querySelectorAll('button[name="seconds"]').forEach(button => {
+        button.addEventListener('mouseenter', function() {
+            const seconds = parseInt(this.value);
+            showPreview(seconds);
+        });
+    });
+});
+
+// Подтверждение отправки форм
+document.querySelectorAll('form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+        const formData = new FormData(this);
+        const seconds = formData.get('seconds');
+        const endDate = formData.get('end_date');
+        const promocode = formData.get('promocode');
+        
+        let message = 'Подтвердите действие:\n\n';
+        
+        if (seconds) {
+            const hours = Math.floor(seconds / 3600);
+            const days = Math.floor(seconds / 86400);
+            if (days > 0) {
+                message += `Добавить ${days} дней (${seconds} секунд) к подписке`;
+            } else if (hours > 0) {
+                message += `Добавить ${hours} часов (${seconds} секунд) к подписке`;
+            } else {
+                message += `Добавить ${seconds} секунд к подписке`;
+            }
+        } else if (endDate) {
+            message += `Установить дату окончания: ${new Date(endDate).toLocaleString('ru-RU')}`;
+        } else if (promocode) {
+            message += `Активировать промокод: ${promocode}`;
+        }
+        
+        if (!confirm(message)) {
+            e.preventDefault();
+        }
+    });
+});
+</script>
+{% endblock %}

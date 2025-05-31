@@ -1,0 +1,276 @@
+{% extends "base.html" %}
+
+{% block title %}{{ user.telegram_id }} - Детали пользователя{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    <h2>👤 Пользователь {{ user.telegram_id }}</h2>
+    <div>
+        <a href="/admin/users" class="btn btn-secondary">← Назад к списку</a>
+        <a href="/admin/users/{{ user.id }}/extend" class="btn btn-warning">⏰ Продлить подписку</a>
+    </div>
+</div>
+
+<!-- Основная информация -->
+<div class="card-grid" style="grid-template-columns: 1fr 1fr;">
+    <div class="card">
+        <div class="card-header">📋 Основная информация</div>
+        <div style="display: grid; gap: 15px;">
+            <div>
+                <strong>Telegram ID:</strong><br>
+                <span style="font-family: monospace; font-size: 16px;">{{ user.telegram_id }}</span>
+            </div>
+            <div>
+                <strong>Email:</strong><br>
+                <span style="font-family: monospace; color: #6c757d;">{{ user.email }}</span>
+            </div>
+            <div>
+                <strong>UUID:</strong><br>
+                <div class="copy-field">
+                    <input type="text" value="{{ user.uuid }}" readonly class="form-control" style="font-family: monospace; font-size: 12px;">
+                    <button class="btn" onclick="copyToClipboard('{{ user.uuid }}')">📋 Копировать</button>
+                </div>
+            </div>
+            <div>
+                <strong>Сервер:</strong><br>
+                {% if user.server_name %}
+                    <span class="status status-active">{{ user.server_name }}</span><br>
+                    <small>{{ user.server_domain }}</small>
+                {% else %}
+                    <span class="status status-warning">Сервер не назначен</span>
+                {% endif %}
+            </div>
+            <div>
+                <strong>Дата регистрации:</strong><br>
+                {{ user.created_at.strftime('%d.%m.%Y %H:%M:%S') }}
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">⏰ Статус подписки</div>
+        <div style="display: grid; gap: 15px;">
+            <div>
+                <strong>Дата окончания:</strong><br>
+                <span style="font-size: 18px; font-weight: bold;">
+                    {{ user.subscription_end.strftime('%d.%m.%Y %H:%M:%S') }}
+                </span>
+            </div>
+            <div>
+                <strong>Статус:</strong><br>
+                {% if user.is_subscription_active %}
+                    <span class="status status-active">✅ Активна</span>
+                {% else %}
+                    <span class="status status-expired">❌ Истекла</span>
+                {% endif %}
+            </div>
+            <div>
+                <strong>Осталось времени:</strong><br>
+                {% set time_left = user.time_left_seconds %}
+                {% if time_left > 0 %}
+                    <span style="color: #28a745; font-weight: bold;">
+                        {{ time_left // 86400 }} дн {{ (time_left % 86400) // 3600 }} ч {{ ((time_left % 3600) // 60) }} мин
+                    </span>
+                {% else %}
+                    <span style="color: #dc3545; font-weight: bold;">Подписка истекла</span>
+                {% endif %}
+            </div>
+            <div>
+                <strong>Всего секунд осталось:</strong><br>
+                <span style="font-family: monospace; font-size: 16px;">
+                    {% if time_left > 0 %}{{ time_left }}{% else %}0{% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- VPN Конфигурация -->
+<div class="card">
+    <div class="card-header">🔐 VPN Конфигурация</div>
+    
+    {% if vpn_config %}
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
+        <div>
+            <h4>📱 VLESS Ключ</h4>
+            <div class="copy-field" style="margin-bottom: 20px;">
+                <input type="text" value="{{ vpn_config }}" readonly class="form-control" style="font-family: monospace; font-size: 11px;">
+                <button class="btn btn-success" onclick="copyToClipboard('{{ vpn_config }}')">📋 Копировать</button>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                <small><strong>💡 Инструкция:</strong></small><br>
+                <small>1. Скопируйте ключ выше</small><br>
+                <small>2. Откройте VPN клиент (V2rayNG, Shadowrocket и т.д.)</small><br>
+                <small>3. Добавьте конфигурацию через "Импорт из буфера обмена"</small>
+            </div>
+        </div>
+        
+        <div style="text-align: center;">
+            <h4>📱 QR-код для быстрого подключения</h4>
+            <div id="qr-code" style="margin: 20px 0;"></div>
+            <button class="btn btn-secondary" onclick="generateQR()">🔄 Сгенерировать QR-код</button>
+        </div>
+    </div>
+    
+    {% else %}
+    <div class="alert alert-danger">
+        <h4>❌ VPN конфигурация недоступна</h4>
+        <p>Возможные причины:</p>
+        <ul>
+            <li>Подписка истекла</li>
+            <li>Сервер недоступен</li>
+            <li>Пользователь не добавлен на сервер</li>
+        </ul>
+        {% if not user.is_subscription_active %}
+        <a href="/admin/users/{{ user.id }}/extend" class="btn btn-warning">⏰ Продлить подписку</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<!-- Быстрое управление подпиской -->
+<div class="card">
+    <div class="card-header">⚡ Быстрое управление подпиской</div>
+    
+    <div class="card-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+        <form method="POST" action="/admin/users/{{ user.id }}/extend-seconds" style="display: contents;">
+            <div class="card" style="margin: 0; background: #f8f9fa;">
+                <strong>➕ 1 час</strong>
+                <button type="submit" name="seconds" value="3600" class="btn btn-success" style="margin-top: 10px;">
+                    Добавить
+                </button>
+            </div>
+        </form>
+        
+        <form method="POST" action="/admin/users/{{ user.id }}/extend-seconds" style="display: contents;">
+            <div class="card" style="margin: 0; background: #f8f9fa;">
+                <strong>➕ 1 день</strong>
+                <button type="submit" name="seconds" value="86400" class="btn btn-success" style="margin-top: 10px;">
+                    Добавить
+                </button>
+            </div>
+        </form>
+        
+        <form method="POST" action="/admin/users/{{ user.id }}/extend-seconds" style="display: contents;">
+            <div class="card" style="margin: 0; background: #f8f9fa;">
+                <strong>➕ 7 дней</strong>
+                <button type="submit" name="seconds" value="604800" class="btn btn-success" style="margin-top: 10px;">
+                    Добавить
+                </button>
+            </div>
+        </form>
+        
+        <form method="POST" action="/admin/users/{{ user.id }}/extend-seconds" style="display: contents;">
+            <div class="card" style="margin: 0; background: #f8f9fa;">
+                <strong>➕ 30 дней</strong>
+                <button type="submit" name="seconds" value="2592000" class="btn btn-success" style="margin-top: 10px;">
+                    Добавить
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Произвольное количество секунд -->
+    <form method="POST" action="/admin/users/{{ user.id }}/extend-seconds" style="margin-top: 20px;">
+        <div class="form-group">
+            <label>🎯 Произвольное количество секунд:</label>
+            <div style="display: flex; gap: 10px; align-items: end;">
+                <input type="number" name="seconds" class="form-control" placeholder="Количество секунд" min="1" style="max-width: 200px;">
+                <button type="submit" class="btn btn-warning">➕ Добавить секунды</button>
+            </div>
+            <small style="color: #6c757d;">Примеры: 3600 = 1 час, 86400 = 1 день, 604800 = 7 дней</small>
+        </div>
+    </form>
+</div>
+
+<!-- История активности -->
+<div class="card">
+    <div class="card-header">📝 История активности</div>
+    {% if user_activity %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Действие</th>
+                    <th>Детали</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for activity in user_activity %}
+                <tr>
+                    <td>{{ activity.timestamp.strftime('%d.%m.%Y %H:%M:%S') }}</td>
+                    <td>
+                        {% if activity.action == 'USER_CREATED' %}
+                            <span class="status status-active">👤 Создан</span>
+                        {% elif activity.action == 'SUBSCRIPTION_EXTENDED' %}
+                            <span class="status status-active">⏰ Продление</span>
+                        {% elif activity.action == 'VPN_ACTIVATED' %}
+                            <span class="status status-active">🔐 Активация VPN</span>
+                        {% elif activity.action == 'VPN_DEACTIVATED' %}
+                            <span class="status status-expired">❌ Деактивация VPN</span>
+                        {% elif activity.action == 'PROMOCODE_ACTIVATED' %}
+                            <span class="status status-warning">🎟️ Промокод</span>
+                        {% else %}
+                            <span class="status">{{ activity.action }}</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ activity.details }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p>История активности пуста</p>
+    {% endif %}
+</div>
+
+<!-- Опасная зона -->
+<div class="card" style="border: 2px solid #dc3545;">
+    <div class="card-header" style="color: #dc3545;">⚠️ Опасная зона</div>
+    <div style="display: flex; gap: 15px;">
+        <form method="POST" action="/admin/users/{{ user.id }}/delete" onsubmit="return confirmDelete('Это действие удалит пользователя со всех серверов и из базы данных. Продолжить?')">
+            <button type="submit" class="btn btn-danger">🗑️ Удалить пользователя</button>
+        </form>
+        
+        <form method="POST" action="/admin/users/{{ user.id }}/reset-subscription">
+            <button type="submit" class="btn btn-danger" onclick="return confirmDelete('Это обнулит подписку пользователя. Продолжить?')">
+                ⏰ Обнулить подписку
+            </button>
+        </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script>
+function generateQR() {
+    const vpnConfig = '{{ vpn_config|safe }}';
+    const qrContainer = document.getElementById('qr-code');
+    
+    if (vpnConfig) {
+        qrContainer.innerHTML = '';
+        QRCode.toCanvas(qrContainer, vpnConfig, {
+            width: 256,
+            margin: 2,
+            color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+            }
+        }, function (error) {
+            if (error) {
+                qrContainer.innerHTML = '<p style="color: #dc3545;">Ошибка генерации QR-кода</p>';
+            }
+        });
+    }
+}
+
+// Автоматически генерируем QR-код при загрузке страницы
+document.addEventListener('DOMContentLoaded', function() {
+    {% if vpn_config %}
+    generateQR();
+    {% endif %}
+});
+</script>
+{% endblock %}

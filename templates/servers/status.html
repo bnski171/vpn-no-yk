@@ -1,0 +1,486 @@
+{% extends "base.html" %}
+
+{% block title %}{{ server.name }} - Статус сервера{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    <h2>📊 Статус сервера {{ server.name }}</h2>
+    <div>
+        <a href="/admin/servers" class="btn btn-secondary">← Назад к списку</a>
+        <button onclick="refreshStatus()" class="btn">🔄 Обновить</button>
+        <a href="/admin/servers/{{ server.id }}/edit" class="btn btn-warning">✏️ Изменить</a>
+    </div>
+</div>
+
+<!-- Общая информация -->
+<div class="card-grid" style="grid-template-columns: 1fr 1fr;">
+    <div class="card">
+        <div class="card-header">🖥️ Информация о сервере</div>
+        <div style="display: grid; gap: 15px;">
+            <div>
+                <strong>Название:</strong><br>
+                <span style="font-size: 16px;">{{ server.name }}</span>
+            </div>
+            <div>
+                <strong>Домен:</strong><br>
+                <span style="font-family: monospace;">{{ server.domain }}</span>
+            </div>
+            <div>
+                <strong>API URL:</strong><br>
+                <span style="font-family: monospace; font-size: 12px; color: #6c757d;">{{ server.api_url }}</span>
+            </div>
+            <div>
+                <strong>Статус:</strong><br>
+                {% if server.is_active %}
+                    <span class="status status-active">✅ Активен</span>
+                {% else %}
+                    <span class="status status-expired">❌ Отключен</span>
+                {% endif %}
+            </div>
+            <div>
+                <strong>Пользователей:</strong><br>
+                <span style="font-size: 18px; font-weight: bold; color: #007bff;">{{ server.user_count }}</span>
+            </div>
+            <div>
+                <strong>Создан:</strong><br>
+                {{ server.created_at.strftime('%d.%m.%Y %H:%M:%S') }}
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">🌐 Сетевая информация</div>
+        <div style="display: grid; gap: 15px;">
+            {% if status.get('server', {}).get('ip') %}
+                <div>
+                    <strong>IPv4:</strong><br>
+                    <span style="font-family: monospace;">{{ status.server.ip.get('ipv4', 'Недоступно') }}</span>
+                </div>
+                <div>
+                    <strong>IPv6:</strong><br>
+                    <span style="font-family: monospace;">{{ status.server.ip.get('ipv6', 'Не настроен') }}</span>
+                </div>
+            {% endif %}
+            <div>
+                <strong>Последняя проверка:</strong><br>
+                <span id="lastCheck">{{ current_time.strftime('%d.%m.%Y %H:%M:%S') }}</span>
+            </div>
+            <div>
+                <strong>Время ответа:</strong><br>
+                <span id="responseTime">
+                    {% if response_time %}
+                        {{ response_time }} мс
+                    {% else %}
+                        Неизвестно
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Статус подключения -->
+<div class="card">
+    <div class="card-header">🔌 Статус подключения</div>
+    
+    {% if status.get('error') %}
+        <div style="padding: 20px; background: #f8d7da; border-radius: 8px; border-left: 4px solid #dc3545;">
+            <h4 style="color: #721c24; margin-bottom: 10px;">❌ Ошибка подключения</h4>
+            <p><strong>Описание:</strong> {{ status.error }}</p>
+            
+            <div style="margin-top: 15px;">
+                <strong>Возможные причины:</strong>
+                <ul style="margin-top: 8px;">
+                    <li>Сервер недоступен или выключен</li>
+                    <li>Неверные настройки API</li>
+                    <li>Проблемы с сетевым подключением</li>
+                    <li>Истек срок действия SSL сертификата</li>
+                </ul>
+            </div>
+            
+            <div style="margin-top: 15px;">
+                <button onclick="testConnection()" class="btn btn-warning">🔍 Проверить соединение</button>
+                <button onclick="pingServer()" class="btn btn-secondary">📡 Ping сервера</button>
+            </div>
+        </div>
+    {% else %}
+        <div style="padding: 20px; background: #d4edda; border-radius: 8px; border-left: 4px solid #28a745;">
+            <h4 style="color: #155724; margin-bottom: 10px;">✅ Сервер доступен</h4>
+            <p>Сервер отвечает на запросы и готов к работе</p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Xray статус -->
+{% if status.get('xray') %}
+<div class="card">
+    <div class="card-header">🔐 Статус Xray</div>
+    
+    <div class="card-grid" style="grid-template-columns: 1fr 1fr;">
+        <div>
+            <div style="display: grid; gap: 15px;">
+                <div>
+                    <strong>Статус службы:</strong><br>
+                    {% if status.xray.get('running', {}).get('service_active') %}
+                        <span class="status status-active">✅ Активна</span>
+                    {% else %}
+                        <span class="status status-expired">❌ Неактивна</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <strong>Версия:</strong><br>
+                    <span style="font-family: monospace;">{{ status.xray.get('version', 'Неизвестно') }}</span>
+                </div>
+                <div>
+                    <strong>Прослушивание портов:</strong><br>
+                    {% if status.xray.get('running', {}).get('port_listening') %}
+                        <span class="status status-active">✅ Порты открыты</span>
+                    {% else %}
+                        <span class="status status-expired">❌ Порты недоступны</span>
+                    {% endif %}
+                </div>
+                <div>
+                    <strong>Конфигурация:</strong><br>
+                    {% if status.xray.get('config_valid') %}
+                        <span class="status status-active">✅ Валидна</span>
+                    {% else %}
+                        <span class="status status-expired">❌ Ошибка</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <div>
+            {% if status.xray.get('errors') %}
+                <div style="margin-bottom: 15px;">
+                    <strong style="color: #dc3545;">❌ Ошибки:</strong>
+                    <ul style="margin-top: 5px; font-size: 14px;">
+                        {% for error in status.xray.errors %}
+                        <li style="color: #dc3545;">{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+            
+            {% if status.xray.get('warnings') %}
+                <div>
+                    <strong style="color: #ffc107;">⚠️ Предупреждения:</strong>
+                    <ul style="margin-top: 5px; font-size: 14px;">
+                        {% for warning in status.xray.warnings %}
+                        <li style="color: #856404;">{{ warning }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+            
+            {% if not status.xray.get('errors') and not status.xray.get('warnings') %}
+                <div style="padding: 15px; background: #e8f5e8; border-radius: 8px; text-align: center;">
+                    <strong style="color: #28a745;">🎉 Все в порядке!</strong><br>
+                    <small>Xray работает без ошибок</small>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div style="margin-top: 20px; display: flex; gap: 15px;">
+        <button onclick="restartXray()" class="btn btn-warning">🔄 Перезапустить Xray</button>
+        <button onclick="reloadXrayConfig()" class="btn btn-secondary">📄 Перезагрузить конфиг</button>
+        <button onclick="showXrayLogs()" class="btn">📋 Показать логи</button>
+    </div>
+</div>
+{% endif %}
+
+<!-- SSL сертификат -->
+{% if status.get('certificate') %}
+<div class="card">
+    <div class="card-header">🔒 SSL Сертификат</div>
+    
+    {% if status.certificate.get('status') %}
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div>
+                <div style="display: grid; gap: 15px;">
+                    <div>
+                        <strong>Статус:</strong><br>
+                        {% if status.certificate.get('is_valid') %}
+                            <span class="status status-active">✅ Действителен</span>
+                        {% else %}
+                            <span class="status status-expired">❌ Истек</span>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <strong>Действителен до:</strong><br>
+                        <span style="font-family: monospace;">{{ status.certificate.get('not_valid_after', 'Неизвестно') }}</span>
+                    </div>
+                    <div>
+                        <strong>Осталось дней:</strong><br>
+                        {% set days_left = status.certificate.get('days_left') %}
+                        {% if days_left is not none %}
+                            {% if days_left > 30 %}
+                                <span style="color: #28a745; font-weight: bold;">{{ days_left }} дней</span>
+                            {% elif days_left > 7 %}
+                                <span style="color: #ffc107; font-weight: bold;">{{ days_left }} дней</span>
+                            {% else %}
+                                <span style="color: #dc3545; font-weight: bold;">{{ days_left }} дней</span>
+                            {% endif %}
+                        {% else %}
+                            <span>Неизвестно</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <div>
+                {% if days_left is not none and days_left < 30 %}
+                    <div style="padding: 15px; background: #fff3cd; border-radius: 8px; border-left: 4px solid #ffc107;">
+                        <strong style="color: #856404;">⚠️ Внимание!</strong><br>
+                        <small>Сертификат скоро истечет. Рекомендуется обновить его.</small>
+                        
+                        <div style="margin-top: 10px;">
+                            <button onclick="renewCertificate()" class="btn btn-warning">🔄 Обновить сертификат</button>
+                        </div>
+                    </div>
+                {% else %}
+                    <div style="padding: 15px; background: #e8f5e8; border-radius: 8px; text-align: center;">
+                        <strong style="color: #28a745;">🔒 Сертификат в порядке</strong><br>
+                        <small>Достаточно времени до истечения</small>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <div style="padding: 20px; background: #f8d7da; border-radius: 8px; border-left: 4px solid #dc3545;">
+            <h4 style="color: #721c24;">❌ Ошибка сертификата</h4>
+            <p>{{ status.certificate.get('error', 'Неизвестная ошибка сертификата') }}</p>
+        </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Системная информация -->
+{% if status.get('system') %}
+<div class="card">
+    <div class="card-header">💻 Системная информация</div>
+    
+    <div class="card-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+        {% if status.system.get('cpu') %}
+        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <div style="font-size: 24px; font-weight: bold; color: #007bff;">
+                {{ status.system.cpu.get('percent', 'N/A') }}%
+            </div>
+            <div style="color: #6c757d;">Загрузка CPU</div>
+            <small>({{ status.system.cpu.get('count', 'N/A') }} ядер)</small>
+        </div>
+        {% endif %}
+        
+        {% if status.system.get('memory') %}
+        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <div style="font-size: 24px; font-weight: bold; color: #28a745;">
+                {{ status.system.memory.get('percent', 'N/A') }}%
+            </div>
+            <div style="color: #6c757d;">Память</div>
+            <small>{{ status.system.memory.get('used', 'N/A') }} / {{ status.system.memory.get('total', 'N/A') }} МБ</small>
+        </div>
+        {% endif %}
+        
+        {% if status.system.get('disk') %}
+        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <div style="font-size: 24px; font-weight: bold; color: #ffc107;">
+                {{ status.system.disk.get('percent', 'N/A') }}%
+            </div>
+            <div style="color: #6c757d;">Диск</div>
+            <small>{{ status.system.disk.get('used', 'N/A') }} / {{ status.system.disk.get('total', 'N/A') }} ГБ</small>
+        </div>
+        {% endif %}
+        
+        {% if status.system.get('network') %}
+        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+            <div style="font-size: 16px; font-weight: bold; color: #6f42c1;">
+                ↑{{ status.system.network.get('bytes_sent', 'N/A') }}МБ<br>
+                ↓{{ status.system.network.get('bytes_recv', 'N/A') }}МБ
+            </div>
+            <div style="color: #6c757d;">Сеть</div>
+        </div>
+        {% endif %}
+    </div>
+    
+    {% if status.system.get('uptime') %}
+    <div style="margin-top: 20px; text-align: center; padding: 15px; background: #e3f2fd; border-radius: 8px;">
+        <strong>⏱️ Время работы сервера:</strong> {{ status.system.uptime }}
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Пользователи на сервере -->
+<div class="card">
+    <div class="card-header">👥 Пользователи на сервере ({{ server.user_count }})</div>
+    
+    {% if server_users %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Telegram ID</th>
+                    <th>Email</th>
+                    <th>Подписка до</th>
+                    <th>Статус</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in server_users %}
+                <tr>
+                    <td>{{ user.telegram_id }}</td>
+                    <td style="font-family: monospace; font-size: 12px;">{{ user.email }}</td>
+                    <td>{{ user.subscription_end.strftime('%d.%m.%Y %H:%M') }}</td>
+                    <td>
+                        {% if user.is_subscription_active %}
+                            <span class="status status-active">Активна</span>
+                        {% else %}
+                            <span class="status status-expired">Истекла</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="/admin/users/{{ user.id }}" class="btn" style="padding: 4px 8px; font-size: 12px;">
+                            Подробно
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align: center; padding: 40px; color: #6c757d;">
+        <h4>👤 Пользователи не найдены</h4>
+        <p>На этом сервере пока нет пользователей</p>
+        <a href="/admin/users/add" class="btn btn-success">➕ Добавить первого пользователя</a>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+async function refreshStatus() {
+    const button = event.target;
+    const originalText = button.textContent;
+    
+    button.textContent = '⏳ Обновление...';
+    button.disabled = true;
+    
+    try {
+        const response = await fetch(`/admin/servers/{{ server.id }}/refresh-status`, { method: 'POST' });
+        if (response.ok) {
+            location.reload();
+        } else {
+            throw new Error('Ошибка обновления статуса');
+        }
+    } catch (error) {
+        alert('Ошибка: ' + error.message);
+    } finally {
+        button.textContent = originalText;
+        button.disabled = false;
+    }
+}
+
+async function testConnection() {
+    const button = event.target;
+    const originalText = button.textContent;
+    
+    button.textContent = '⏳ Проверка...';
+    button.disabled = true;
+    
+    try {
+        const response = await fetch(`/admin/servers/{{ server.id }}/test-connection`, { method: 'POST' });
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ Соединение успешно!\n\nВремя ответа: ' + (result.response_time || 'N/A'));
+        } else {
+            alert('❌ Ошибка соединения:\n\n' + result.error);
+        }
+    } catch (error) {
+        alert('❌ Ошибка проверки: ' + error.message);
+    } finally {
+        button.textContent = originalText;
+        button.disabled = false;
+    }
+}
+
+async function pingServer() {
+    const button = event.target;
+    const originalText = button.textContent;
+    
+    button.textContent = '📡 Ping...';
+    button.disabled = true;
+    
+    try {
+        const response = await fetch(`/admin/servers/{{ server.id }}/ping`, { method: 'POST' });
+        const result = await response.json();
+        
+        if (result.success) {
+            alert(`📡 Ping результат:\n\nВремя ответа: ${result.ping_time}мс\nСтатус: ${result.status}`);
+        } else {
+            alert('❌ Ping неудачен:\n\n' + result.error);
+        }
+    } catch (error) {
+        alert('❌ Ошибка ping: ' + error.message);
+    } finally {
+        button.textContent = originalText;
+        button.disabled = false;
+    }
+}
+
+async function restartXray() {
+    if (!confirm('Перезапустить Xray? Это временно прервет соединения пользователей.')) return;
+    
+    const button = event.target;
+    const originalText = button.textContent;
+    
+    button.textContent = '⏳ Перезапуск...';
+    button.disabled = true;
+    
+    try {
+        const response = await fetch(`/admin/servers/{{ server.id }}/restart-xray`, { method: 'POST' });
+        const result = await response.json();
+        
+        if (result.success) {
+            alert('✅ Xray перезапущен успешно!');
+            setTimeout(() => location.reload(), 2000);
+        } else {
+            alert('❌ Ошибка перезапуска Xray:\n\n' + result.error);
+        }
+    } catch (error) {
+        alert('❌ Ошибка: ' + error.message);
+    } finally {
+        button.textContent = originalText;
+        button.disabled = false;
+    }
+}
+
+function reloadXrayConfig() {
+    alert('Функция перезагрузки конфигурации будет доступна в следующем обновлении');
+}
+
+function showXrayLogs() {
+    window.open(`/admin/servers/{{ server.id }}/logs/xray`, '_blank');
+}
+
+function renewCertificate() {
+    if (!confirm('Обновить SSL сертификат? Это может занять несколько минут.')) return;
+    
+    alert('Функция обновления сертификата будет доступна в следующем обновлении');
+}
+
+// Автообновление времени последней проверки
+function updateLastCheck() {
+    document.getElementById('lastCheck').textContent = new Date().toLocaleString('ru-RU');
+}
+
+// Автообновление статуса каждые 30 секунд
+setInterval(() => {
+    if (!document.hidden) {
+        updateLastCheck();
+    }
+}, 30000);
+</script>
+{% endblock %}

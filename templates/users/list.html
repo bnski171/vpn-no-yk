@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Пользователи - VPN Admin Panel{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    <h2>👥 Пользователи</h2>
+    <div>
+        <a href="/admin/users/add" class="btn btn-success">➕ Добавить пользователя</a>
+        <a href="/admin/users/bulk-extend" class="btn btn-warning">⏰ Массовое продление</a>
+    </div>
+</div>
+
+<!-- Фильтры и поиск -->
+<div class="card" style="margin-bottom: 20px;">
+    <div class="card-header">🔍 Поиск и фильтры</div>
+    <form method="GET" style="display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 15px; align-items: end;">
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Поиск по Telegram ID / Email</label>
+            <input type="text" name="search" class="form-control" value="{{ request.args.get('search', '') }}" placeholder="Введите ID или email">
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Статус подписки</label>
+            <select name="status" class="form-control">
+                <option value="">Все</option>
+                <option value="active" {% if request.args.get('status') == 'active' %}selected{% endif %}>Активные</option>
+                <option value="expired" {% if request.args.get('status') == 'expired' %}selected{% endif %}>Истекшие</option>
+            </select>
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 0;">
+            <label>Сервер</label>
+            <select name="server" class="form-control">
+                <option value="">Все серверы</option>
+                {% for server in servers %}
+                <option value="{{ server.id }}" {% if request.args.get('server') == server.id|string %}selected{% endif %}>
+                    {{ server.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+        
+        <button type="submit" class="btn">🔍 Поиск</button>
+    </form>
+</div>
+
+<!-- Статистика -->
+<div class="stats-grid" style="grid-template-columns: repeat(4, 1fr); margin-bottom: 25px;">
+    <div class="stat-card">
+        <div class="stat-value">{{ pagination.total }}</div>
+        <div>Всего найдено</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ users_stats.active_count }}</div>
+        <div>Активных</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ users_stats.expired_count }}</div>
+        <div>Истекших</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ users_stats.expiring_soon }}</div>
+        <div>Истекают скоро</div>
+    </div>
+</div>
+
+<!-- Таблица пользователей -->
+<div class="card">
+    <div class="card-header">Список пользователей ({{ pagination.page }} из {{ pagination.pages }})</div>
+    
+    {% if users %}
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Пользователь</th>
+                    <th>Сервер</th>
+                    <th>Подписка</th>
+                    <th>Статус</th>
+                    <th>Создан</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.id }}</td>
+                    <td>
+                        <strong>{{ user.telegram_id }}</strong><br>
+                        <small style="color: #6c757d; font-family: monospace;">{{ user.email }}</small>
+                    </td>
+                    <td>
+                        {% if user.server_name %}
+                            <span class="status status-active">{{ user.server_name }}</span>
+                        {% else %}
+                            <span class="status status-warning">Не назначен</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <strong>{{ user.subscription_end.strftime('%d.%m.%Y %H:%M') }}</strong><br>
+                        {% set time_left = user.time_left_seconds %}
+                        {% if time_left > 0 %}
+                            <small style="color: #28a745;">
+                                {% if time_left > 86400 %}
+                                    {{ (time_left // 86400)|int }} дн
+                                {% elif time_left > 3600 %}
+                                    {{ (time_left // 3600)|int }} ч
+                                {% else %}
+                                    {{ (time_left // 60)|int }} мин
+                                {% endif %}
+                            </small>
+                        {% else %}
+                            <small style="color: #dc3545;">Истекла</small>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if user.is_subscription_active %}
+                            <span class="status status-active">Активна</span>
+                        {% else %}
+                            <span class="status status-expired">Истекла</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span data-timestamp="{{ user.created_at.isoformat() }}">
+                            {{ user.created_at.strftime('%d.%m.%Y') }}
+                        </span>
+                    </td>
+                    <td>
+                        <div style="display: flex; gap: 5px;">
+                            <a href="/admin/users/{{ user.id }}" class="btn" style="padding: 6px 12px; font-size: 12px;">
+                                📋 Детали
+                            </a>
+                            <a href="/admin/users/{{ user.id }}/extend" class="btn btn-warning" style="padding: 6px 12px; font-size: 12px;">
+                                ⏰ Продлить
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    <!-- Пагинация -->
+    {% if pagination.pages > 1 %}
+    <div class="pagination">
+        {% if pagination.has_prev %}
+            <a href="{{ url_for(request.endpoint, page=pagination.prev_num, **request.args) }}">&laquo; Пред</a>
+        {% endif %}
+        
+        {% for page_num in pagination.iter_pages() %}
+            {% if page_num %}
+                {% if page_num != pagination.page %}
+                    <a href="{{ url_for(request.endpoint, page=page_num, **request.args) }}">{{ page_num }}</a>
+                {% else %}
+                    <span class="current">{{ page_num }}</span>
+                {% endif %}
+            {% else %}
+                <span>...</span>
+            {% endif %}
+        {% endfor %}
+        
+        {% if pagination.has_next %}
+            <a href="{{ url_for(request.endpoint, page=pagination.next_num, **request.args) }}">След &raquo;</a>
+        {% endif %}
+    </div>
+    {% endif %}
+    
+    {% else %}
+    <div style="text-align: center; padding: 40px; color: #6c757d;">
+        <h3>🔍 Пользователи не найдены</h3>
+        <p>Попробуйте изменить параметры поиска или <a href="/admin/users/add">добавить нового пользователя</a></p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

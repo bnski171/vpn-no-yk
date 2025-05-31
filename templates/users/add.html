@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}Добавить пользователя - VPN Admin Panel{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px;">
+    <h2>➕ Добавить пользователя</h2>
+    <a href="/admin/users" class="btn btn-secondary">← Назад к списку</a>
+</div>
+
+<div class="card-grid" style="grid-template-columns: 1fr 1fr;">
+    <div class="card">
+        <div class="card-header">📋 Основная информация</div>
+        
+        <form method="POST" action="/admin/users/add">
+            <div class="form-group">
+                <label for="telegram_id">Telegram ID *</label>
+                <input type="text" id="telegram_id" name="telegram_id" class="form-control" required 
+                       placeholder="Например: 123456789" pattern="[0-9]{5,15}">
+                <small style="color: #6c757d;">Только цифры, от 5 до 15 символов</small>
+            </div>
+            
+            <div class="form-group">
+                <label for="server_id">Сервер</label>
+                <select id="server_id" name="server_id" class="form-control">
+                    <option value="auto">🎯 Автоматический выбор (рекомендуется)</option>
+                    {% for server in servers %}
+                    <option value="{{ server.id }}">{{ server.name }} ({{ server.user_count }} пользователей)</option>
+                    {% endfor %}
+                </select>
+                <small style="color: #6c757d;">Автоматический выбор назначит наименее загруженный сервер</small>
+            </div>
+            
+            <h4 style="margin: 25px 0 15px 0;">⏰ Начальная подписка</h4>
+            
+            <div class="form-group">
+                <label for="subscription_seconds">Продолжительность в секундах</label>
+                <input type="number" id="subscription_seconds" name="subscription_seconds" 
+                       class="form-control" value="0" min="0" max="31536000">
+                <small style="color: #6c757d;">0 = без подписки, 3600 = 1 час, 86400 = 1 день</small>
+            </div>
+            
+            <div style="margin-bottom: 20px;">
+                <strong>Быстрый выбор:</strong>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 10px;">
+                    <button type="button" class="btn btn-secondary" onclick="setSeconds(0)">Без подписки</button>
+                    <button type="button" class="btn btn-secondary" onclick="setSeconds(3600)">1 час</button>
+                    <button type="button" class="btn btn-secondary" onclick="setSeconds(86400)">1 день</button>
+                    <button type="button" class="btn btn-secondary" onclick="setSeconds(604800)">7 дней</button>
+                    <button type="button" class="btn btn-secondary" onclick="setSeconds(2592000)">30 дней</button>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 15px; margin-top: 30px;">
+                <button type="submit" class="btn btn-success">✅ Создать пользователя</button>
+                <button type="reset" class="btn btn-secondary">🔄 Очистить форму</button>
+            </div>
+        </form>
+    </div>
+    
+    <div class="card">
+        <div class="card-header">💡 Подсказки</div>
+        
+        <div style="display: grid; gap: 15px;">
+            <div style="padding: 15px; background: #e3f2fd; border-radius: 8px;">
+                <strong>📱 Как узнать Telegram ID?</strong><br>
+                <small>
+                    1. Откройте бот @userinfobot в Telegram<br>
+                    2. Отправьте команду /start<br>
+                    3. Скопируйте ID из ответа бота
+                </small>
+            </div>
+            
+            <div style="padding: 15px; background: #f3e5f5; border-radius: 8px;">
+                <strong>⏰ Расчет времени:</strong><br>
+                <small>
+                    • 1 минута = 60 секунд<br>
+                    • 1 час = 3,600 секунд<br>
+                    • 1 день = 86,400 секунд<br>
+                    • 1 неделя = 604,800 секунд<br>
+                    • 1 месяц = 2,592,000 секунд
+                </small>
+            </div>
+            
+            <div style="padding: 15px; background: #e8f5e8; border-radius: 8px;">
+                <strong>🖥️ Выбор сервера:</strong><br>
+                <small>
+                    Автоматический выбор назначает сервер с наименьшей нагрузкой. 
+                    Ручной выбор подходит для распределения пользователей по географии.
+                </small>
+            </div>
+            
+            <div style="padding: 15px; background: #fff3e0; border-radius: 8px;">
+                <strong>🔐 Безопасность:</strong><br>
+                <small>
+                    Каждому пользователю автоматически генерируется уникальный email 
+                    и UUID для подключения к VPN серверу.
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function setSeconds(seconds) {
+    document.getElementById('subscription_seconds').value = seconds;
+    
+    // Показываем человекочитаемое время
+    let timeStr = '';
+    if (seconds === 0) {
+        timeStr = 'Без подписки';
+    } else if (seconds < 3600) {
+        timeStr = `${Math.floor(seconds / 60)} минут`;
+    } else if (seconds < 86400) {
+        timeStr = `${Math.floor(seconds / 3600)} часов`;
+    } else {
+        timeStr = `${Math.floor(seconds / 86400)} дней`;
+    }
+    
+    // Можно добавить всплывающую подсказку
+    console.log(`Установлено: ${seconds} секунд (${timeStr})`);
+}
+
+// Валидация формы
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('form');
+    const telegramIdInput = document.getElementById('telegram_id');
+    
+    form.addEventListener('submit', function(e) {
+        const telegramId = telegramIdInput.value.trim();
+        
+        if (!/^[0-9]{5,15}$/.test(telegramId)) {
+            e.preventDefault();
+            alert('Telegram ID должен содержать только цифры и быть длиной от 5 до 15 символов');
+            telegramIdInput.focus();
+            return false;
+        }
+    });
+    
+    // Автоматическое удаление нецифровых символов из Telegram ID
+    telegramIdInput.addEventListener('input', function(e) {
+        this.value = this.value.replace(/[^0-9]/g, '');
+    });
+});
+</script>
+{% endblock %}
