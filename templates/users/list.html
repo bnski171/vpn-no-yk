@@ -154,6 +154,7 @@
         try {
             const btn = e.currentTarget;
             const user_id = btn.getAttribute('data-user-id');
+            const return_url = window.location.href;
 
             const response = await fetch('/api/payments/pay-link', {
                 method: 'POST',

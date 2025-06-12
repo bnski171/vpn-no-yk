@@ -25,6 +25,7 @@ def get_pay_url():
         duration = int(data.get('duration', 0))
         amount = int(data.get('amount', 0))
         user_id = int(data.get('user_id', 0))
+        return_url = int(data.get('return_url'))
 
         # получаем данные  пользователя
         user = PaymentDB.get_user(user_id)
@@ -34,7 +35,8 @@ def get_pay_url():
             user_id=user_id,
             duration_days=duration,
             email=user['email'],
-            next_amount=amount
+            next_amount=amount,
+            return_url=return_url
         )
 
         return jsonify({

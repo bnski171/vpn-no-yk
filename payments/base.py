@@ -30,6 +30,7 @@ class PaymentYK:
     def get_pay_link(
             user_id: int,
             duration_days: int,
+            return_url: str = None,
             email: str = Config.DEFAULT_PAY_EMAIL,
             amount: int = 1,
             next_amount: int = None,
@@ -42,7 +43,7 @@ class PaymentYK:
             },
             "confirmation": {
                 "type": "redirect",
-                "return_url": Config.RETURN_URL
+                "return_url": return_url or Config.RETURN_URL
             },
             "capture": True,
             "description": description,
