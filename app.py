@@ -46,10 +46,12 @@ def create_app():
         from api.users import users_bp
         from api.servers import servers_bp
         from api.subscriptions import subscriptions_bp
+        from api.payments import payments_bp
 
         app.register_blueprint(users_bp)
         app.register_blueprint(servers_bp)
         app.register_blueprint(subscriptions_bp)
+        app.register_blueprint(payments_bp)
         logging.info("API маршруты зарегистрированы")
 
     except ImportError as e:

@@ -37,6 +37,7 @@ class DatabaseInitializer:
                     server_id INTEGER,
                     subscription_end TIMESTAMP NOT NULL,
                     is_active BOOLEAN DEFAULT TRUE,
+                    is_refuse_payment BOOLEAN DEFAULT FALSE,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (server_id) REFERENCES servers(id)
@@ -79,6 +80,21 @@ class DatabaseInitializer:
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (user_id) REFERENCES users(id)
                 )
+            ''')
+
+            # Таблица оплат
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS payments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    user_id INTEGER NOT NULL,
+                    payment_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    duration_days INTEGER NOT NULL,
+                    amount FLOAT NOT NULL,
+                    FOREIGN KEY (user_id) REFERENCES users(id)
+                );
             ''')
 
             # Создание индексов для оптимизации

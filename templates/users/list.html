@@ -135,6 +135,10 @@
                             <a href="/admin/users/{{ user.id }}/extend" class="btn btn-warning" style="padding: 6px 12px; font-size: 12px;">
                                 ⏰ Продлить
                             </a>
+                            </a>
+                            <button type="button" id="pay-btn" data-user-id="{{ user.id }}"  class="btn btn-warning" style="padding: 6px 12px; font-size: 12px;">💳 Оплатить</button>
+                            <button type="button" id="resufe-btn" data-user-id="{{ user.id }}"  class="btn btn-warning" style="padding: 6px 12px; font-size: 12px;">Отменить подписку</button>
+
                         </div>
                     </td>
                 </tr>
@@ -142,6 +146,60 @@
             </tbody>
         </table>
     </div>
+
+<!--  скрипты для проверки оплаты  -->
+    <script>
+    // создаёт оплату
+    document.getElementById('pay-btn').addEventListener('click', async function(e) {
+        try {
+            const btn = e.currentTarget;
+            const user_id = btn.getAttribute('data-user-id');
+            const return_url = window.location.href;
+
+            const response = await fetch('/api/payments/pay-link', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    duration: 30, 
+                    amount: 500,
+                    user_id: user_id,
+                    return_url: return_url,
+                })
+            });
+            const data = await response.json();
+            if (data.confirmation_url) {
+                window.open(data.confirmation_url, '_blank');
+            } else {
+                alert('Ошибка: не удалось получить ссылку для оплаты');
+            }
+        } catch (err) {
+            alert('Ошибка: ' + err);
+        }
+    });
+    
+    // отменяет подписку
+    document.getElementById('resufe-btn').addEventListener('click', async function(e) {
+        try {
+            const btn = e.currentTarget;
+            const user_id = btn.getAttribute('data-user-id');
+
+            const response = await fetch(`/api/payments/refuse-recurrent/${user_id}`, {
+                method: 'GET',
+              
+            });
+            const data = await response.json();
+            if (data.success) {
+                alert('Подписка отменена');
+
+            } else {
+                console.log(data)
+                alert('Ошибка: не удалось отменить подписку');
+            }
+        } catch (err) {
+            alert('Ошибка: ' + err);
+        }
+    });
+</script>
     
     <!-- Пагинация -->
     {% if pagination.pages > 1 %}
@@ -176,3 +234,4 @@
     {% endif %}
 </div>
 {% endblock %}
+

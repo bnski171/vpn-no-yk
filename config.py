@@ -26,3 +26,10 @@ class Config:
 
     # Настройки генерации пользователей
     EMAIL_DOMAIN = 'vpnservice.local'
+
+    # Для оплаты
+    YOOKASSA_SHOP_ID = 1067539
+    YOOKASSA_SECRET_KEY = "test_Ev58vsG3m4cVaicUoz-lTFkUZ98j20tEBw3jeDUOCVU"
+    DEFAULT_PAY_EMAIL = 'example@mail.ru'
+    RETURN_URL = 'https://your-site.ru/payments/success'
+    TRIAL = 14
