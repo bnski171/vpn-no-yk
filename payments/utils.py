@@ -94,19 +94,12 @@ class PaymentDB:
             if not row:
                 raise ValueError(f"Пользователь с id={user_id} не найден")
 
-            subscription_end_str, is_active = row
+            subscription_end, is_active = row
             if not is_active:
                 raise ValueError(f"У пользователя id={user_id} неактивен аккаунт (is_active=0)")
 
-            # 2. Проверяем текущий срок
-            now = datetime.now()
-            try:
-                subscription_end = datetime.fromisoformat(subscription_end_str)
-            except Exception:
-                # Если вдруг в БД некорректный формат — начинаем с текущей даты
-                subscription_end = now
-
             # 3. Считаем новую дату окончания подписки
+            now = datetime.now()
             if subscription_end < now:
                 new_end = now + timedelta(days=duration_days)
             else:

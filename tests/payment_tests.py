@@ -72,7 +72,7 @@ def send_payment_succeeded_notification():
     "paid" : True,
     "refundable" : True,
     "metadata" : {
-      "duration_days" : "14",
+      "duration_days" : "30",
       "next_amount" : "500.0",
       "is_trial" : "0",
       "user_id" : "1",
