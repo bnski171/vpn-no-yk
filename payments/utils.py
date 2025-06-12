@@ -71,7 +71,7 @@ class PaymentDB:
         with db_manager.get_connection() as conn:
             cursor = conn.execute(
                 '''
-                UPDATE payments
+                UPDATE users
                 SET is_refuse_payment = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 ''',
