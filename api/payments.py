@@ -25,7 +25,7 @@ def get_pay_url():
         duration = int(data.get('duration', 0))
         amount = int(data.get('amount', 0))
         user_id = int(data.get('user_id', 0))
-        return_url = int(data.get('return_url'))
+        return_url = data.get('return_url')
 
         # получаем данные  пользователя
         user = PaymentDB.get_user(user_id)

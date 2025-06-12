@@ -162,7 +162,8 @@
                 body: JSON.stringify({
                     duration: 30, 
                     amount: 500,
-                    user_id: user_id
+                    user_id: user_id,
+                    return_url: return_url,
                 })
             });
             const data = await response.json();
