@@ -154,6 +154,7 @@ class PaymentYK:
             trigger='date',
             run_date=next_date,
             args=[amount, payment_id, email, duration_days, user_id],
-            id=f"recurrent_payment_{payment_id}"
+            id=f"recurrent_payment_{payment_id}",
+            replace_existing=True
         )
 

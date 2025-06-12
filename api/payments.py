@@ -57,6 +57,7 @@ def success_payment():
     """Принимает успешную оплату"""
     try:
         data = request.get_json()
+        print(data)
         payment_data: dict = data.get("object")
         if not payment_data:
             return jsonify({"success": False, "error": "Отсутствуют данные запроса"}), 400
@@ -75,17 +76,20 @@ def success_payment():
         duration_days = int(metadata['duration_days'])
         next_amount = float(metadata['next_amount'])
 
+        # в пробный переод продолжительность из конфига, но вследующее списание всегда ставим промежуток из запроса
+        current_duration = Config.TRIAL if is_trial else duration_days
         # обновляем статус платежа
         PaymentDB.save_payment(
             user_id=user_id,
             payment_id=payment_id,
-            duration_days=Config.TRIAL if is_trial else duration_days,
+            duration_days=current_duration,
             amount=amount,
             status=status
         )
 
         #  Обновляем срок подписки
-        subscription_end = PaymentDB.prolong_subscription(user_id, duration_days)
+        subscription_end = PaymentDB.prolong_subscription(user_id, current_duration)
+        print(f'subscription_end: {subscription_end}')
         PaymentYK.schedule_check_payment(
             payment_id=payment_id,
             next_date=subscription_end,
