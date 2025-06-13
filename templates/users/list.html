@@ -187,12 +187,13 @@
                 method: 'GET',
               
             });
-            const data = await response.json();
-            if (data.success) {
+           const data = await response.json();
+            if (data.success && data.is_refuse) {
                 alert('Подписка отменена');
-
+            } else if (data.success) {
+                alert('Разрешено автосписание');
             } else {
-                console.log(data)
+                console.log(data);
                 alert('Ошибка: не удалось отменить подписку');
             }
         } catch (err) {

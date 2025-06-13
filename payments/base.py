@@ -92,6 +92,7 @@ class PaymentYK:
 
         description = 'Оплата подписки'
 
+
         payment = Payment.create({
             "amount": {
                 "value": amount,

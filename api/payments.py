@@ -57,7 +57,6 @@ def success_payment():
     """Принимает успешную оплату"""
     try:
         data = request.get_json()
-        print(data)
         payment_data: dict = data.get("object")
         if not payment_data:
             return jsonify({"success": False, "error": "Отсутствуют данные запроса"}), 400
@@ -89,7 +88,6 @@ def success_payment():
 
         #  Обновляем срок подписки
         subscription_end = PaymentDB.prolong_subscription(user_id, current_duration)
-        print(f'subscription_end: {subscription_end}')
         PaymentYK.schedule_check_payment(
             payment_id=payment_id,
             next_date=subscription_end,
@@ -117,9 +115,11 @@ def success_payment():
 def refuse_recurent(user_id: int):
     """Принимает отказ от оплаты"""
     try:
-        PaymentDB.resufe_user_recurrent(user_id)
+        user = PaymentDB.get_user(user_id)
+        is_refuse = False if user['is_refuse_payment'] else True
+        PaymentDB.refuse_user_recurrent(user_id, is_refuse)
 
-        return jsonify({"success": True}), 200
+        return jsonify({"success": True, 'is_refuse': is_refuse}), 200
 
     except Exception as e:
         logger.warning(e, exc_info=True)
