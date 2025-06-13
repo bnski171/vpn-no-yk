@@ -9,16 +9,6 @@ logger = logging.getLogger(__name__)
 class PaymentDB:
     """Работа с бд для оплат"""
 
-    @classmethod
-    def get_tariff(cls, tariff_id: int) -> dict | None:
-        """Получение Тарифа"""
-        with db_manager.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT * FROM tariffs where id = ?", (tariff_id, ))
-            row = cursor.fetchone()
-            return dict(row) if row else None
-
-
     @staticmethod
     def get_user(user_id: int) -> dict | None:
         """Получение данных пользователя"""
@@ -47,6 +37,8 @@ class PaymentDB:
                 ''',
                 (user_id, payment_id, status, duration_days, amount)
             )
+            conn.commit()
+
             return cursor.lastrowid
 
     @staticmethod
@@ -62,21 +54,24 @@ class PaymentDB:
                 ''',
                 (status, payment_id)
             )
+            conn.commit()
+
             return cursor.rowcount
 
     @staticmethod
-    def resufe_user_recurrent(user_id: int) -> None:
+    def refuse_user_recurrent(user_id: int, is_refuse: bool) -> None:
         """Отменяет автоплатёж"""
 
         with db_manager.get_connection() as conn:
-            cursor = conn.execute(
+            conn.execute(
                 '''
                 UPDATE users
                 SET is_refuse_payment = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
                 ''',
-                (True, user_id)
+                (is_refuse, user_id)
             )
+            conn.commit()
 
     @staticmethod
     def prolong_subscription(user_id: int, duration_days: int) -> datetime:
