@@ -92,7 +92,6 @@ class PaymentYK:
 
         description = 'Оплата подписки'
 
-
         payment = Payment.create({
             "amount": {
                 "value": amount,
@@ -148,7 +147,7 @@ class PaymentYK:
         """
         Ставит план на следующее списание
         """
-        next_date = datetime.now() + timedelta(minutes=1)
+        # next_date = datetime.now() + timedelta(minutes=1)
         logger.info(f'Автосписание для пользователя: {user_id} След запуск: {next_date}')
         scheduler.add_job(
             cls.recurrent_payment,
